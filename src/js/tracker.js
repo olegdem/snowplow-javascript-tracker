@@ -123,8 +123,11 @@
 			// Snowplow collector URL
 			configCollectorUrl,
 
-			// Site ID
-			configTrackerSiteId = argmap.hasOwnProperty('appId') ? argmap.appId : '', // Updated for Snowplow
+            // App ID
+            configTrackerSiteId = argmap.hasOwnProperty('appId') ? argmap.appId : '', // Updated for Snowplow
+
+            // Parent App ID
+            configTrackerParentAppId = argmap.hasOwnProperty('parentAppId') ? argmap.parentAppId : '',
 
 			// Document URL
 			configCustomUrl,
@@ -306,7 +309,7 @@
 		}
 
 		if (autoContexts.gaCookies) {
-			commonContexts.push(getGaCookiesContext());
+			commonContexts.push(getAnalyticsCookiesContext());
 		}
 
 		if (autoContexts.geolocation) {
@@ -319,11 +322,15 @@
 		// Set up unchanging name-value pairs
 		core.setTrackerVersion(version);
 		core.setTrackerNamespace(namespace);
-		core.setAppId(configTrackerSiteId);
+        core.setAppId(configTrackerSiteId);
 		core.setPlatform(configPlatform);
 		core.setTimezone(detectors.detectTimezone());
 		core.addPayloadPair('lang', browserLanguage);
 		core.addPayloadPair('cs', documentCharset);
+
+		if (configTrackerParentAppId) {
+            core.setParentAppId(configTrackerParentAppId);
+		}
 
 		// Browser features. Cookies, color depth and resolution don't get prepended with f_ (because they're not optional features)
 		for (var i in browserFeatures) {
@@ -819,81 +826,6 @@
 				}
 			}
 
-			// Add Optimizely Contexts
-			if (windowAlias.optimizely) {
-
-				if (autoContexts.optimizelySummary) {
-					var activeExperiments = getOptimizelySummaryContexts();
-					lodash.each(activeExperiments, function (e) {
-						combinedContexts.push(e)
-					})
-				}
-
-				if (autoContexts.optimizelyXSummary) {
-					var activeExperiments = getOptimizelyXSummaryContexts();
-					lodash.each(activeExperiments, function (e) {
-						combinedContexts.push(e);
-					})
-				}
-
-				if (autoContexts.optimizelyExperiments) {
-					var experimentContexts = getOptimizelyExperimentContexts();
-					for (var i = 0; i < experimentContexts.length; i++) {
-						combinedContexts.push(experimentContexts[i]);
-					}
-				}
-
-				if (autoContexts.optimizelyStates) {
-					var stateContexts = getOptimizelyStateContexts();
-					for (var i = 0; i < stateContexts.length; i++) {
-						combinedContexts.push(stateContexts[i]);
-					}
-				}
-
-				if (autoContexts.optimizelyVariations) {
-					var variationContexts = getOptimizelyVariationContexts();
-					for (var i = 0; i < variationContexts.length; i++) {
-						combinedContexts.push(variationContexts[i]);
-					}
-				}
-
-				if (autoContexts.optimizelyVisitor) {
-					var optimizelyVisitorContext = getOptimizelyVisitorContext();
-					if (optimizelyVisitorContext) {
-						combinedContexts.push(optimizelyVisitorContext);
-					}
-				}
-
-				if (autoContexts.optimizelyAudiences) {
-					var audienceContexts = getOptimizelyAudienceContexts();
-					for (var i = 0; i < audienceContexts.length; i++) {
-						combinedContexts.push(audienceContexts[i]);
-					}
-				}
-
-				if (autoContexts.optimizelyDimensions) {
-					var dimensionContexts = getOptimizelyDimensionContexts();
-					for (var i = 0; i < dimensionContexts.length; i++) {
-						combinedContexts.push(dimensionContexts[i]);
-					}
-				}
-			}
-
-			// Add Augur Context
-			if (autoContexts.augurIdentityLite) {
-				var augurIdentityLiteContext = getAugurIdentityLiteContext();
-				if (augurIdentityLiteContext) {
-					combinedContexts.push(augurIdentityLiteContext);
-				}
-			}
-			
-			//Add Parrable Context
-			if (autoContexts.parrable) {
-				var parrableContext = getParrableContext();
-				if (parrableContext) {
-					combinedContexts.push(parrableContext);
-				}
-			}
 			return combinedContexts;
 		}
 
@@ -970,353 +902,6 @@
 				};
 			}
 		}
-
-		/**
-		 * Check that *both* optimizely and optimizely.data exist and return
-		 * optimizely.data.property
-		 *
-		 * @param property optimizely data property
-		 * @param snd optional nested property
-		 */
-		function getOptimizelyData(property, snd) {
-			var data;
-			if (windowAlias.optimizely && windowAlias.optimizely.data) {
-				data = windowAlias.optimizely.data[property];
-				if (typeof snd !== 'undefined' && data !== undefined) {
-					data = data[snd]
-				}
-			}
-			return data
-		}
-
-		/**
-		 * Check that *both* optimizely and optimizely.data exist
-		 *
-		 * @param property optimizely data property
-		 * @param snd optional nested property
-		 */
-		function getOptimizelyXData(property, snd) {
-			var data;
-			if (windowAlias.optimizely) {
-				data = windowAlias.optimizely.get(property);
-				if (typeof snd !== 'undefined' && data !== undefined) {
-					data = data[snd]
-				}
-			}
-			return data
-		}
-
-		/**
-		 * Get data for Optimizely "lite" contexts - active experiments on current page
-		 * 
-		 * @returns Array content of lite optimizely lite context
-		 */
-		function getOptimizelySummary() {
-			var state = getOptimizelyData('state');
-			var experiments = getOptimizelyData('experiments');
-
-			return lodash.map(state && experiments && state.activeExperiments, function (activeExperiment) {
-				var current = experiments[activeExperiment];
-				return {
-					activeExperimentId: activeExperiment.toString(),
-					// User can be only in one variation (don't know why is this array)
-					variation: state.variationIdsMap[activeExperiment][0].toString(),
-					conditional: current && current.conditional,
-					manual: current && current.manual,
-					name: current && current.name
-				}
-			});
-		}
-
-		/**
-		 * Get data for OptimizelyX contexts - active experiments on current page
-		 * 
-		 * @returns Array content of lite optimizely lite context
-		 */
-		function getOptimizelyXSummary() {
-			var state = getOptimizelyXData('state');
-			var experiment_ids = state.getActiveExperimentIds();
-			var experiments = getOptimizelyXData('data', 'experiments');
-			var visitor = getOptimizelyXData('visitor');
-
-			return lodash.map(experiment_ids, function(activeExperiment) {
-				variation = state.getVariationMap()[activeExperiment];
-				variationName = variation.name;
-				variationId = variation.id;
-				visitorId = visitor.visitorId;
-				return {
-					experimentId: parseInt(activeExperiment),
-					variationName: variationName,
-					variation: parseInt(variationId),
-					visitorId: visitorId
-				}
-			})
-		}
-
-		/**
-		 * Creates a context from the window['optimizely'].data.experiments object
-		 *
-		 * @return Array Experiment contexts
-		 */
-		function getOptimizelyExperimentContexts() {
-			var experiments = getOptimizelyData('experiments');
-			if (experiments) {
-				var contexts = [];
-
-				for (var key in experiments) {
-					if (experiments.hasOwnProperty(key)) {
-						var context = {};
-						context.id = key;
-						var experiment = experiments[key];
-						context.code = experiment.code;
-						context.manual = experiment.manual;
-						context.conditional = experiment.conditional;
-						context.name = experiment.name;
-						context.variationIds = experiment.variation_ids;
-
-						contexts.push({
-							schema: 'iglu:com.optimizely/experiment/jsonschema/1-0-0',
-							data: context
-						});
-					}
-				}
-				return contexts;
-			}
-			return [];
-		}
-
-		/**
-		 * Creates a context from the window['optimizely'].data.state object
-		 *
-		 * @return Array State contexts
-		 */
-		function getOptimizelyStateContexts() {
-			var experimentIds = [];
-			var experiments = getOptimizelyData('experiments');
-			if (experiments) {
-				for (var key in experiments) {
-					if (experiments.hasOwnProperty(key)) {
-						experimentIds.push(key);
-					}
-				}
-			}
-
-			var state = getOptimizelyData('state');
-			if (state) {
-				var contexts = [];
-				var activeExperiments = state.activeExperiments || [];
-
-				for (var i = 0; i < experimentIds.length; i++) {
-					var experimentId = experimentIds[i];
-					var context = {};
-					context.experimentId = experimentId;
-					context.isActive = helpers.isValueInArray(experimentIds[i], activeExperiments);
-					var variationMap = state.variationMap || {};
-					context.variationIndex = variationMap[experimentId];
-					var variationNamesMap = state.variationNamesMap || {};
-					context.variationName = variationNamesMap[experimentId];
-					var variationIdsMap = state.variationIdsMap || {};
-					if (variationIdsMap[experimentId] && variationIdsMap[experimentId].length === 1) {
-						context.variationId = variationIdsMap[experimentId][0];
-					}
-
-					contexts.push({
-						schema: 'iglu:com.optimizely/state/jsonschema/1-0-0',
-						data: context
-					});
-				}
-				return contexts;
-			}
-			return [];
-		}
-
-		/**
-		 * Creates a context from the window['optimizely'].data.variations object
-		 *
-		 * @return Array Variation contexts
-		 */
-		function getOptimizelyVariationContexts() {
-			var variations = getOptimizelyData('variations');
-			if (variations) {
-				var contexts = [];
-
-				for (var key in variations) {
-					if (variations.hasOwnProperty(key)) {
-						var context = {};
-						context.id = key;
-						var variation = variations[key];
-						context.name = variation.name;
-						context.code = variation.code;
-
-						contexts.push({
-							schema: 'iglu:com.optimizely/variation/jsonschema/1-0-0',
-							data: context
-						});
-					}
-				}
-				return contexts;
-			}
-			return [];
-		}
-
-		/**
-		 * Creates a context from the window['optimizely'].data.visitor object
-		 *
-		 * @return object Visitor context
-		 */
-		function getOptimizelyVisitorContext() {
-			var visitor = getOptimizelyData('visitor');
-			if (visitor) {
-				var context = {};
-				context.browser = visitor.browser;
-				context.browserVersion = visitor.browserVersion;
-				context.device = visitor.device;
-				context.deviceType = visitor.deviceType;
-				context.ip = visitor.ip;
-				var platform = visitor.platform || {};
-				context.platformId = platform.id;
-				context.platformVersion = platform.version;
-				var location = visitor.location || {};
-				context.locationCity = location.city;
-				context.locationRegion = location.region;
-				context.locationCountry = location.country;
-				context.mobile = visitor.mobile;
-				context.mobileId = visitor.mobileId;
-				context.referrer = visitor.referrer;
-				context.os = visitor.os;
-
-				return {
-					schema: 'iglu:com.optimizely/visitor/jsonschema/1-0-0',
-					data: context
-				};
-			}
-		}
-
-		/**
-		 * Creates a context from the window['optimizely'].data.visitor.audiences object
-		 *
-		 * @return Array VisitorAudience contexts
-		 */
-		function getOptimizelyAudienceContexts() {
-			var audienceIds = getOptimizelyData('visitor', 'audiences');
-			if (audienceIds) {
-				var contexts = [];
-
-				for (var key in audienceIds) {
-					if (audienceIds.hasOwnProperty(key)) {
-						var context = { id: key, isMember: audienceIds[key] };
-
-						contexts.push({
-							schema: 'iglu:com.optimizely/visitor_audience/jsonschema/1-0-0',
-							data: context
-						});
-					}
-				}
-				return contexts;
-			}
-			return [];
-		}
-
-		/**
-		 * Creates a context from the window['optimizely'].data.visitor.dimensions object
-		 *
-		 * @return Array VisitorDimension contexts
-		 */
-		function getOptimizelyDimensionContexts() {
-			var dimensionIds = getOptimizelyData('visitor', 'dimensions');
-			if (dimensionIds) {
-				var contexts = [];
-
-				for (var key in dimensionIds) {
-					if (dimensionIds.hasOwnProperty(key)) {
-						var context = { id: key, value: dimensionIds[key] };
-
-						contexts.push({
-							schema: 'iglu:com.optimizely/visitor_dimension/jsonschema/1-0-0',
-							data: context
-						});
-					}
-				}
-				return contexts;
-			}
-			return [];
-		}
-
-
-		/**
-		 * Creates an Optimizely lite context containing only data required to join
-		 * event to experiment data
-		 *
-		 * @returns Array of custom contexts
-		 */
-		function getOptimizelySummaryContexts() {
-			return lodash.map(getOptimizelySummary(), function (experiment) {
-				return {
-					schema: 'iglu:com.optimizely.snowplow/optimizely_summary/jsonschema/1-0-0',
-					data: experiment
-				};
-			});
-		}
-
-		/**
-		 * Creates an OptimizelyX context containing only data required to join
-		 * event to experiment data
-		 *
-		 * @returns Array of custom contexts
-		 */
-		function getOptimizelyXSummaryContexts() {
-			return lodash.map(getOptimizelyXSummary(), function (experiment) {
-				return {
-					schema: 'iglu:com.optimizely.optimizelyx/summary/jsonschema/1-0-0',
-					data: experiment
-				};
-			});
-		}
-
-		/**
-		 * Creates a context from the window['augur'] object
-		 *
-		 * @return object The IdentityLite context
-		 */
-		function getAugurIdentityLiteContext() {
-			var augur = windowAlias.augur;
-			if (augur) {
-				var context = { consumer: {}, device: {} };
-				var consumer = augur.consumer || {};
-				context.consumer.UUID = consumer.UID;
-				var device = augur.device || {};
-				context.device.ID = device.ID;
-				context.device.isBot = device.isBot;
-				context.device.isProxied = device.isProxied;
-				context.device.isTor = device.isTor;
-				var fingerprint = device.fingerprint || {};
-				context.device.isIncognito = fingerprint.browserHasIncognitoEnabled;
-
-				return {
-					schema: 'iglu:io.augur.snowplow/identity_lite/jsonschema/1-0-0',
-					data: context
-				};
-			}
-		}
-
-		/**
-		 * Creates a context from the window['_hawk'] object
-		 *
-		 * @return object The Parrable context
-		 */
-		function getParrableContext() {
-			var parrable = window['_hawk'];
-			if (parrable) {
-				var context = { encryptedId: null, optout: null };
-				context['encryptedId'] = parrable.browserid;
-				var regex = new RegExp('(?:^|;)\\s?' + "_parrable_hawk_optout".replace(/([.*+?^=!:${}()|[\]\/\\])/g, '\\$1') + '=(.*?)(?:;|$)', 'i'), match = document.cookie.match(regex);
-				context['optout'] = (match && decodeURIComponent(match[1])) ? match && decodeURIComponent(match[1]) : "false";
-				return {
-					schema: 'iglu:com.parrable/encrypted_payload/jsonschema/1-0-0',
-					data: context
-				};
-			}
-		}
 		
 		/**
 		 * Attempts to create a context using the geolocation API and add it to commonContexts
@@ -1345,13 +930,13 @@
 		}
 
 		/**
-		 * Creates a context containing the values of the cookies set by GA
+		 * Creates a context containing the values of the cookies set by GA and Ya.Metrika
 		 *
 		 * @return object GA cookies context
 		 */
-		function getGaCookiesContext() {
+		function getAnalyticsCookiesContext() {
 			var gaCookieData = {};
-			lodash.forEach(['__utma', '__utmb', '__utmc', '__utmv', '__utmz', '_ga'], function (cookieType) {
+			lodash.forEach(['__utma', '__utmb', '__utmc', '__utmv', '__utmz', '_ga', '_ym_uid'], function (cookieType) {
 				var value = cookie.cookie(cookieType);
 				if (value) {
 					gaCookieData[cookieType] = value;
@@ -1471,41 +1056,6 @@
 				cleanOffset(maxYOffset),
 				addCommonContexts(context));
 			resetMaxScrolls();
-		}
-
-		/**
-		 * Log ecommerce transaction metadata
-		 *
-		 * @param string orderId
-		 * @param string affiliation
-		 * @param string total
-		 * @param string tax
-		 * @param string shipping
-		 * @param string city
-		 * @param string state
-		 * @param string country
-		 * @param string currency The currency the total/tax/shipping are expressed in
-		 * @param object context Custom context relating to the event
-		 * @param tstamp number or Timestamp object
-		 */
-		function logTransaction(orderId, affiliation, total, tax, shipping, city, state, country, currency, context, tstamp) {
-			core.trackEcommerceTransaction(orderId, affiliation, total, tax, shipping, city, state, country, currency, addCommonContexts(context), tstamp);
-		}
-
-		/**
-		 * Log ecommerce transaction item
-		 *
-		 * @param string orderId
-		 * @param string sku
-		 * @param string name
-		 * @param string category
-		 * @param string price
-		 * @param string quantity
-		 * @param string currency The currency the price is expressed in
-		 * @param object context Custom context relating to the event
-		 */
-		function logTransactionItem(orderId, sku, name, category, price, quantity, currency, context, tstamp) {
-			core.trackEcommerceTransactionItem(orderId, sku, name, category, price, quantity, currency, addCommonContexts(context), tstamp);
 		}
 
 		/**
@@ -1654,16 +1204,6 @@
 			},
 
 			/**
-			* Specify the app ID
-			*
-			* @param int|string appId
-			*/
-			setAppId: function (appId) {
-				helpers.warn('setAppId is deprecated. Instead add an "appId" field to the argmap argument of newTracker.');
-				core.setAppId(appId);
-			},
-
-			/**
 			 * Override referrer
 			 *
 			 * @param string url
@@ -1703,27 +1243,6 @@
 			},
 
 			/**
-			 * Set first-party cookie name prefix
-			 *
-			 * @param string cookieNamePrefix
-			 */
-			setCookieNamePrefix: function (cookieNamePrefix) {
-				helpers.warn('setCookieNamePrefix is deprecated. Instead add a "cookieName" field to the argmap argument of newTracker.');
-				configCookieNamePrefix = cookieNamePrefix;
-			},
-
-			/**
-			 * Set first-party cookie domain
-			 *
-			 * @param string domain
-			 */
-			setCookieDomain: function (domain) {
-				helpers.warn('setCookieDomain is deprecated. Instead add a "cookieDomain" field to the argmap argument of newTracker.');
-				configCookieDomain = helpers.fixupDomain(domain);
-				updateDomainHash();
-			},
-
-			/**
 			 * Set first-party cookie path
 			 *
 			 * @param string domain
@@ -1740,50 +1259,6 @@
 			 */
 			setVisitorCookieTimeout: function (timeout) {
 				configVisitorCookieTimeout = timeout;
-			},
-
-			/**
-			 * Set session cookie timeout (in seconds)
-			 *
-			 * @param int timeout
-			 */
-			setSessionCookieTimeout: function (timeout) {
-				helpers.warn('setSessionCookieTimeout is deprecated. Instead add a "sessionCookieTimeout" field to the argmap argument of newTracker.')
-				configSessionCookieTimeout = timeout;
-			},
-
-			/**
-			* @param number seed The seed used for MurmurHash3
-			*/
-			setUserFingerprintSeed: function(seed) {
-				helpers.warn('setUserFingerprintSeed is deprecated. Instead add a "userFingerprintSeed" field to the argmap argument of newTracker.');
-				configUserFingerprintHashSeed = seed;
-				userFingerprint = detectors.detectSignature(configUserFingerprintHashSeed);
-			},
-
-			/**
-			* Enable/disable user fingerprinting. User fingerprinting is enabled by default.
-			* @param bool enable If false, turn off user fingerprinting
-			*/
-			enableUserFingerprint: function(enable) {
-				helpers.warn('enableUserFingerprintSeed is deprecated. Instead add a "userFingerprint" field to the argmap argument of newTracker.');
-				if (!enable) {
-					userFingerprint = '';
-				}
-			},
-
-			/**
-			 * Prevent tracking if user's browser has Do Not Track feature enabled,
-			 * where tracking is:
-			 * 1) Sending events to a collector
-			 * 2) Setting first-party cookies
-			 * @param bool enable If true and Do Not Track feature enabled, don't track.
-			 */
-			respectDoNotTrack: function (enable) {
-				helpers.warn('This usage of respectDoNotTrack is deprecated. Instead add a "respectDoNotTrack" field to the argmap argument of newTracker.');
-				var dnt = navigatorAlias.doNotTrack || navigatorAlias.msDoNotTrack;
-
-				configDoNotTrack = enable && (dnt === 'yes' || dnt === '1');
 			},
 
 			/**
@@ -1980,15 +1455,6 @@
 			},
 
 			/**
-			 * Configure this tracker to log to a CloudFront collector.
-			 *
-			 * @param string distSubdomain The subdomain on your CloudFront collector's distribution
-			 */
-			setCollectorCf: function (distSubdomain) {
-				configCollectorUrl = collectorUrlFromCfDist(distSubdomain);
-			},
-
-			/**
 			 *
 			 * Specify the Snowplow collector URL. No need to include HTTP
 			 * or HTTPS - we will add this.
@@ -1997,27 +1463,6 @@
 			 */
 			setCollectorUrl: function (rawUrl) {
 				configCollectorUrl = asCollectorUrl(rawUrl);
-			},
-
-			/**
-			* Specify the platform
-			*
-			* @param string platform Overrides the default tracking platform
-			*/
-			setPlatform: function(platform) {
-				helpers.warn('setPlatform is deprecated. Instead add a "platform" field to the argmap argument of newTracker.');
-				core.setPlatform(platform);
-			},
-
-			/**
-			*
-			* Enable Base64 encoding for self-describing event payload
-			*
-			* @param bool enabled A boolean value indicating if the Base64 encoding for self-describing events should be enabled or not
-			*/
-			encodeBase64: function (enabled) {
-				helpers.warn('This usage of encodeBase64 is deprecated. Instead add an "encodeBase64" field to the argmap argument of newTracker.');
-				core.setBase64Encoding(enabled);
 			},
 
 			/**
@@ -2090,105 +1535,6 @@
 			},
 
 			/**
-			 * Track an ecommerce transaction
-			 *
-			 * @param string orderId Required. Internal unique order id number for this transaction.
-			 * @param string affiliation Optional. Partner or store affiliation.
-			 * @param string total Required. Total amount of the transaction.
-			 * @param string tax Optional. Tax amount of the transaction.
-			 * @param string shipping Optional. Shipping charge for the transaction.
-			 * @param string city Optional. City to associate with transaction.
-			 * @param string state Optional. State to associate with transaction.
-			 * @param string country Optional. Country to associate with transaction.
-			 * @param string currency Optional. Currency to associate with this transaction.
-			 * @param object context Optional. Context relating to the event.
-			 * @param tstamp number or Timestamp object
-			 */
-			addTrans: function(orderId, affiliation, total, tax, shipping, city, state, country, currency, context, tstamp) {
-				ecommerceTransaction.transaction = {
-					orderId: orderId,
-					affiliation: affiliation,
-					total: total,
-					tax: tax,
-					shipping: shipping,
-					city: city,
-					state: state,
-					country: country,
-					currency: currency,
-					context: context,
-					tstamp: tstamp
-				};
-			},
-
-			/**
-			 * Track an ecommerce transaction item
-			 *
-			 * @param string orderId Required Order ID of the transaction to associate with item.
-			 * @param string sku Required. Item's SKU code.
-			 * @param string name Optional. Product name.
-			 * @param string category Optional. Product category.
-			 * @param string price Required. Product price.
-			 * @param string quantity Required. Purchase quantity.
-			 * @param string currency Optional. Product price currency.
-			 * @param object context Optional. Context relating to the event.
-			 * @param tstamp number or Timestamp object
-			 */
-			addItem: function(orderId, sku, name, category, price, quantity, currency, context, tstamp) {
-				ecommerceTransaction.items.push({
-					orderId: orderId,
-					sku: sku,
-					name: name,
-					category: category,
-					price: price,
-					quantity: quantity,
-					currency: currency,
-					context: context,
-					tstamp: tstamp
-				});
-			},
-
-			/**
-			 * Commit the ecommerce transaction
-			 *
-			 * This call will send the data specified with addTrans,
-			 * addItem methods to the tracking server.
-			 */
-			trackTrans: function() {
-				trackCallback(function () {
-
-					logTransaction(
-						ecommerceTransaction.transaction.orderId,
-						ecommerceTransaction.transaction.affiliation,
-						ecommerceTransaction.transaction.total,
-						ecommerceTransaction.transaction.tax,
-						ecommerceTransaction.transaction.shipping,
-						ecommerceTransaction.transaction.city,
-						ecommerceTransaction.transaction.state,
-						ecommerceTransaction.transaction.country,
-						ecommerceTransaction.transaction.currency,
-						ecommerceTransaction.transaction.context,
-						ecommerceTransaction.transaction.tstamp
-					);
-					for (var i = 0; i < ecommerceTransaction.items.length; i++) {
-						var item = ecommerceTransaction.items[i];
-						logTransactionItem(
-							item.orderId,
-							item.sku,
-							item.name,
-							item.category,
-							item.price,
-							item.quantity,
-							item.currency,
-							item.context,
-							item.tstamp
-						);
-					}
-
-					ecommerceTransaction = ecommerceTransactionTemplate();
-				});
-			},
-
-			/**
 			 * Manually log a click from your own code
 			 *
 			 * @param string elementId
@@ -2207,67 +1553,6 @@
 			},
 
 			/**
-			 * Track an ad being served
-			 *
-			 * @param string impressionId Identifier for a particular ad impression
-			 * @param string costModel The cost model. 'cpa', 'cpc', or 'cpm'
-			 * @param number cost Cost
-			 * @param string bannerId Identifier for the ad banner displayed
-			 * @param string zoneId Identifier for the ad zone
-			 * @param string advertiserId Identifier for the advertiser
-			 * @param string campaignId Identifier for the campaign which the banner belongs to
-			 * @param object Custom context relating to the event
-			 * @param tstamp number or Timestamp object
-			 */
-			trackAdImpression: function(impressionId, costModel, cost, targetUrl, bannerId, zoneId, advertiserId, campaignId, context, tstamp) {
-				trackCallback(function () {
-					core.trackAdImpression(impressionId, costModel, cost, targetUrl, bannerId, zoneId, advertiserId, campaignId, addCommonContexts(context), tstamp);
-				});
-			},
-
-			/**
-			 * Track an ad being clicked
-			 *
-			 * @param string clickId Identifier for the ad click
-			 * @param string costModel The cost model. 'cpa', 'cpc', or 'cpm'
-			 * @param number cost Cost
-			 * @param string targetUrl (required) The link's target URL
-			 * @param string bannerId Identifier for the ad banner displayed
-			 * @param string zoneId Identifier for the ad zone
-			 * @param string impressionId Identifier for a particular ad impression
-			 * @param string advertiserId Identifier for the advertiser
-			 * @param string campaignId Identifier for the campaign which the banner belongs to
-			 * @param object Custom context relating to the event
-			 * @param tstamp number or Timestamp object
-			 */
-			trackAdClick: function(targetUrl, clickId, costModel, cost, bannerId, zoneId, impressionId, advertiserId, campaignId, context, tstamp) {
-				trackCallback(function () {
-					core.trackAdClick(targetUrl, clickId, costModel, cost, bannerId, zoneId, impressionId, advertiserId, campaignId, addCommonContexts(context), tstamp);
-				});
-			},
-
-			/**
-			 * Track an ad conversion event
-			 *
-			 * @param string conversionId Identifier for the ad conversion event
-			 * @param number cost Cost
-			 * @param string category The name you supply for the group of objects you want to track
-			 * @param string action A string that is uniquely paired with each category
-			 * @param string property Describes the object of the conversion or the action performed on it
-			 * @param number initialValue Revenue attributable to the conversion at time of conversion
-			 * @param string advertiserId Identifier for the advertiser
-			 * @param string costModel The cost model. 'cpa', 'cpc', or 'cpm'
-			 * @param string campaignId Identifier for the campaign which the banner belongs to
-			 * @param object Custom context relating to the event
-			 * @param tstamp number or Timestamp object
-			 */
-			trackAdConversion: function(conversionId, costModel, cost, category, action, property, initialValue, advertiserId, campaignId, context, tstamp) {
-				trackCallback(function () {
-					core.trackAdConversion(conversionId, costModel, cost, category, action, property, initialValue, advertiserId, campaignId, addCommonContexts(context), tstamp);
-				});
-			},
-
-			/**
 			 * Track a social interaction event
 			 *
 			 * @param string action (required) Social action performed
@@ -2279,42 +1564,6 @@
 			trackSocialInteraction: function(action, network, target, context, tstamp) {
 				trackCallback(function () {
 					core.trackSocialInteraction(action, network, target, addCommonContexts(context), tstamp);
-				});
-			},
-
-			/**
-			 * Track an add-to-cart event
-			 *
-			 * @param string sku Required. Item's SKU code.
-			 * @param string name Optional. Product name.
-			 * @param string category Optional. Product category.
-			 * @param string unitPrice Optional. Product price.
-			 * @param string quantity Required. Quantity added.
-			 * @param string currency Optional. Product price currency.
-			 * @param array context Optional. Context relating to the event.
-			 * @param tstamp number or Timestamp object
-			 */
-			trackAddToCart: function(sku, name, category, unitPrice, quantity, currency, context, tstamp) {
-				trackCallback(function () {
-					core.trackAddToCart(sku, name, category, unitPrice, quantity, currency, addCommonContexts(context), tstamp);
-				});
-			},
-
-			/**
-			 * Track a remove-from-cart event
-			 *
-			 * @param string sku Required. Item's SKU code.
-			 * @param string name Optional. Product name.
-			 * @param string category Optional. Product category.
-			 * @param string unitPrice Optional. Product price.
-			 * @param string quantity Required. Quantity removed.
-			 * @param string currency Optional. Product price currency.
-			 * @param array context Optional. Context relating to the event.
-			 * @param tstamp Opinal number or Timestamp object
-			 */
-			trackRemoveFromCart: function(sku, name, category, unitPrice, quantity, currency, context, tstamp) {
-				trackCallback(function () {
-					core.trackRemoveFromCart(sku, name, category, unitPrice, quantity, currency, addCommonContexts(context), tstamp);
 				});
 			},
 
@@ -2355,146 +1604,6 @@
 							label: label
 						}
 					}, addCommonContexts(context), tstamp)
-				});
-			},
-
-			/**
-			 * Track a GA Enhanced Ecommerce Action with all stored
-			 * Enhanced Ecommerce contexts
-			 *
-			 * @param string action
-			 * @param array context Optional. Context relating to the event.
-			 * @param tstamp Opinal number or Timestamp object
-			 */
-			trackEnhancedEcommerceAction: function (action, context, tstamp) {
-				var combinedEnhancedEcommerceContexts = enhancedEcommerceContexts.concat(context || []);
-				enhancedEcommerceContexts.length = 0;
-
-				trackCallback(function () {
-					core.trackSelfDescribingEvent({
-						schema: 'iglu:com.google.analytics.enhanced-ecommerce/action/jsonschema/1-0-0',
-						data: {
-							action: action
-						}
-					}, addCommonContexts(combinedEnhancedEcommerceContexts), tstamp);
-				});
-			},
-
-			/**
-			 * Adds a GA Enhanced Ecommerce Action Context
-			 *
-			 * @param string id
-			 * @param string affiliation
-			 * @param number revenue
-			 * @param number tax
-			 * @param number shipping
-			 * @param string coupon
-			 * @param string list
-			 * @param integer step
-			 * @param string option
-			 * @param string currency
-			 */
-			addEnhancedEcommerceActionContext: function (id, affiliation, revenue, tax, shipping, coupon, list, step, option, currency) {
-				enhancedEcommerceContexts.push({
-					schema: 'iglu:com.google.analytics.enhanced-ecommerce/actionFieldObject/jsonschema/1-0-0',
-					data: {
-						id: id,
-						affiliation: affiliation,
-						revenue: helpers.parseFloat(revenue),
-						tax: helpers.parseFloat(tax),
-						shipping: helpers.parseFloat(shipping),
-						coupon: coupon,
-						list: list,
-						step: helpers.parseInt(step),
-						option: option,
-						currency: currency
-					}
-				});
-			},
-
-			/**
-			 * Adds a GA Enhanced Ecommerce Impression Context
-			 *
-			 * @param string id
-			 * @param string name
-			 * @param string list
-			 * @param string brand
-			 * @param string category
-			 * @param string variant
-			 * @param integer position
-			 * @param number price
-			 * @param string currency
-			 */
-			addEnhancedEcommerceImpressionContext: function (id, name, list, brand, category, variant, position, price, currency) {
-				enhancedEcommerceContexts.push({
-					schema: 'iglu:com.google.analytics.enhanced-ecommerce/impressionFieldObject/jsonschema/1-0-0',
-					data: {
-						id: id,
-						name: name,
-						list: list,
-						brand: brand,
-						category: category,
-						variant: variant,
-						position: helpers.parseInt(position),
-						price: helpers.parseFloat(price),
-						currency: currency
-					}
-				});
-			},
-
-			/**
-			 * Adds a GA Enhanced Ecommerce Product Context
-			 *
-			 * @param string id
-			 * @param string name
-			 * @param string list
-			 * @param string brand
-			 * @param string category
-			 * @param string variant
-			 * @param number price
-			 * @param integer quantity
-			 * @param string coupon
-			 * @param integer position
-			 * @param string currency
-			 */
-			addEnhancedEcommerceProductContext: function (id, name, list, brand, category, variant, price, quantity, coupon, position, currency) {
-				enhancedEcommerceContexts.push({
-					schema: 'iglu:com.google.analytics.enhanced-ecommerce/productFieldObject/jsonschema/1-0-0',
-					data: {
-						id: id,
-						name: name,
-						list: list,
-						brand: brand,
-						category: category,
-						variant: variant,
-						price: helpers.parseFloat(price),
-						quantity: helpers.parseInt(quantity),
-						coupon: coupon,
-						position: helpers.parseInt(position),
-						currency: currency
-					}
-				});
-			},
-
-			/**
-			 * Adds a GA Enhanced Ecommerce Promo Context
-			 *
-			 * @param string id
-			 * @param string name
-			 * @param string creative
-			 * @param string position
-			 * @param string currency
-			 */
-			addEnhancedEcommercePromoContext: function (id, name, creative, position, currency) {
-				enhancedEcommerceContexts.push({
-					schema: 'iglu:com.google.analytics.enhanced-ecommerce/promoFieldObject/jsonschema/1-0-0',
-					data: {
-						id: id,
-						name: name,
-						creative: creative,
-						position: position,
-						currency: currency
-					}
 				});
 			},
 

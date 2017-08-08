@@ -221,14 +221,23 @@ export function trackerCore(base64: boolean, callback?: (PayloadData) => void) {
 			addPayloadPair('tna', name);
 		},
 
-		/**
-		 * Set the application ID
-		 *
-		 * @param appId string
-		 */
-		setAppId: function (appId: string) {
-			addPayloadPair('aid', appId);
-		},
+        /**
+         * Set the application ID
+         *
+         * @param appId string
+         */
+        setAppId: function (appId: string) {
+            addPayloadPair('aid', appId);
+        },
+
+        /**
+         * Set the parent application ID
+         *
+         * @param parentAppId string
+         */
+        setParentAppId: function (parentAppId: string) {
+            addPayloadPair('paid', parentAppId);
+        },
 
 		/**
 		 * Set the platform
@@ -404,88 +413,6 @@ export function trackerCore(base64: boolean, callback?: (PayloadData) => void) {
 		},
 
 		/**
-		 * Track an ecommerce transaction
-		 *
-		 * @param orderId Required. Internal unique order id number for this transaction.
-		 * @param affiliation Optional. Partner or store affiliation.
-		 * @param totalValue Required. Total amount of the transaction.
-		 * @param taxValue Optional. Tax amount of the transaction.
-		 * @param shipping Optional. Shipping charge for the transaction.
-		 * @param city Optional. City to associate with transaction.
-		 * @param state Optional. State to associate with transaction.
-		 * @param country Optional. Country to associate with transaction.
-		 * @param currency Optional. Currency to associate with this transaction.
-		 * @param context Optional. Context relating to the event.
-		 * @param tstamp Optional. TrackerTimestamp of the event
-		 * @return Payload
-		 */
-		trackEcommerceTransaction: function (
-			orderId: string,
-			affiliation: string,
-			totalValue: string,
-			taxValue?: string,
-			shipping?: string,
-			city?: string,
-			state?: string,
-			country?: string,
-			currency?: string,
-			context?: Array<SelfDescribingJson>,
-			tstamp?: Timestamp): PayloadData {
-
-			var sb = payload.payloadBuilder(base64);
-			sb.add('e', 'tr'); // 'tr' for Transaction
-			sb.add("tr_id", orderId);
-			sb.add("tr_af", affiliation);
-			sb.add("tr_tt", totalValue);
-			sb.add("tr_tx", taxValue);
-			sb.add("tr_sh", shipping);
-			sb.add("tr_ci", city);
-			sb.add("tr_st", state);
-			sb.add("tr_co", country);
-			sb.add("tr_cu", currency);
-
-			return track(sb, context, tstamp);
-		},
-
-		/**
-		 * Track an ecommerce transaction item
-		 *
-		 * @param orderId Required Order ID of the transaction to associate with item.
-		 * @param sku Required. Item's SKU code.
-		 * @param name Optional. Product name.
-		 * @param category Optional. Product category.
-		 * @param price Required. Product price.
-		 * @param quantity Required. Purchase quantity.
-		 * @param currency Optional. Product price currency.
-		 * @param context Optional. Context relating to the event.
-		 * @param tstamp Optional. TrackerTimestamp of the event
-		 * @return object Payload
-		 */
-		trackEcommerceTransactionItem: function (
-			orderId: string,
-			sku: string,
-			name: string,
-			category: string,
-			price: string,
-			quantity: string,
-			currency?: string,
-			context?: Array<SelfDescribingJson>,
-			tstamp?: Timestamp): PayloadData {
-
-			var sb = payload.payloadBuilder(base64);
-			sb.add("e", "ti"); // 'tr' for Transaction Item
-			sb.add("ti_id", orderId);
-			sb.add("ti_sk", sku);
-			sb.add("ti_nm", name);
-			sb.add("ti_ca", category);
-			sb.add("ti_pr", price);
-			sb.add("ti_qu", quantity);
-			sb.add("ti_cu", currency);
-
-			return track(sb, context, tstamp);
-		},
-
-		/**
 		 * Track a screen view unstructured event
 		 *
 		 * @param name The name of the screen
@@ -545,146 +472,6 @@ export function trackerCore(base64: boolean, callback?: (PayloadData) => void) {
 		},
 
 		/**
-		 * Track an ad being served
-		 *
-		 * @param impressionId Identifier for a particular ad impression
-		 * @param costModel The cost model. 'cpa', 'cpc', or 'cpm'
-		 * @param cost Cost
-		 * @param targetUrl URL ad pointing to
-		 * @param bannerId Identifier for the ad banner displayed
-		 * @param zoneId Identifier for the ad zone
-		 * @param advertiserId Identifier for the advertiser
-		 * @param campaignId Identifier for the campaign which the banner belongs to
-		 * @param context Custom contexts relating to the event
-		 * @param tstamp TrackerTimestamp of the event
-		 * @return object Payload
-		 */
-		trackAdImpression: function (
-			impressionId: string,
-			costModel: string,
-			cost: number,
-			targetUrl: string,
-			bannerId: string,
-			zoneId: string,
-			advertiserId: string,
-			campaignId: string,
-			context?: Array<SelfDescribingJson>,
-			tstamp?: Timestamp): PayloadData {
-
-			var eventJson = {
-				schema: 'iglu:com.snowplowanalytics.snowplow/ad_impression/jsonschema/1-0-0',
-				data: removeEmptyProperties({
-					impressionId: impressionId,
-					costModel: costModel,
-					cost: cost,
-					targetUrl: targetUrl,
-					bannerId: bannerId,
-					zoneId: zoneId,
-					advertiserId: advertiserId,
-					campaignId: campaignId
-				})
-			};
-
-			return trackSelfDescribingEvent(eventJson, context, tstamp);
-		},
-
-		/**
-		 * Track an ad being clicked
-		 *
-		 * @param targetUrl (required) The link's target URL
-		 * @param clickId Identifier for the ad click
-		 * @param costModel The cost model. 'cpa', 'cpc', or 'cpm'
-		 * @param cost Cost
-		 * @param bannerId Identifier for the ad banner displayed
-		 * @param zoneId Identifier for the ad zone
-		 * @param impressionId Identifier for a particular ad impression
-		 * @param advertiserId Identifier for the advertiser
-		 * @param campaignId Identifier for the campaign which the banner belongs to
-		 * @param context Custom contexts relating to the event
-		 * @param tstamp TrackerTimestamp of the event
-		 * @return object Payload
-		 */
-		trackAdClick: function (
-			targetUrl: string,
-			clickId: string,
-			costModel: string,
-			cost: number,
-			bannerId: string,
-			zoneId: string,
-			impressionId: string,
-			advertiserId: string,
-			campaignId: string,
-			context?: Array<SelfDescribingJson>,
-			tstamp?: Timestamp): PayloadData {
-
-			var eventJson = {
-				schema: 'iglu:com.snowplowanalytics.snowplow/ad_click/jsonschema/1-0-0',
-				data: removeEmptyProperties({
-					targetUrl: targetUrl,
-					clickId: clickId,
-					costModel: costModel,
-					cost: cost,
-					bannerId: bannerId,
-					zoneId: zoneId,
-					impressionId: impressionId,
-					advertiserId: advertiserId,
-					campaignId: campaignId
-				})
-			};
-
-			return trackSelfDescribingEvent(eventJson, context, tstamp);
-		},
-
-		/**
-		 * Track an ad conversion event
-		 *
-		 * @param conversionId Identifier for the ad conversion event
-		 * @param costModel The cost model. 'cpa', 'cpc', or 'cpm'
-		 * @param cost Cost
-		 * @param category The name you supply for the group of objects you want to track
-		 * @param action A string that is uniquely paired with each category
-		 * @param property Describes the object of the conversion or the action performed on it
-		 * @param initialValue Revenue attributable to the conversion at time of conversion
-		 * @param advertiserId Identifier for the advertiser
-		 * @param campaignId Identifier for the campaign which the banner belongs to
-		 * @param context Custom contexts relating to the event
-		 * @param tstamp TrackerTimestamp of the event
-		 * @return object Payload
-		 *
-		 * @todo make costModel enum
-		 */
-		trackAdConversion: function (
-			conversionId: string,
-			costModel: string,
-			cost: number,
-			category: string,
-			action: string,
-			property: string,
-			initialValue: number,
-			advertiserId: string,
-			campaignId: string,
-			context?: Array<SelfDescribingJson>,
-			tstamp?: Timestamp): PayloadData {
-
-			var eventJson = {
-				schema: 'iglu:com.snowplowanalytics.snowplow/ad_conversion/jsonschema/1-0-0',
-				data: removeEmptyProperties({
-					conversionId: conversionId,
-					costModel: costModel,
-					cost: cost,
-					category: category,
-					action: action,
-					property: property,
-					initialValue: initialValue,
-					advertiserId: advertiserId,
-					campaignId: campaignId
-				})
-			};
-
-			return trackSelfDescribingEvent(eventJson, context, tstamp);
-		},
-
-		/**
 		 * Track a social event
 		 *
 		 * @param action Social action performed
@@ -711,78 +498,6 @@ export function trackerCore(base64: boolean, callback?: (PayloadData) => void) {
 			};
 
 			return trackSelfDescribingEvent(eventJson, context, tstamp);
-		},
-
-		/**
-		 * Track an add-to-cart event
-		 *
-		 * @param sku Required. Item's SKU code.
-		 * @param name Optional. Product name.
-		 * @param category Optional. Product category.
-		 * @param unitPrice Optional. Product price.
-		 * @param quantity Required. Quantity added.
-		 * @param currency Optional. Product price currency.
-		 * @param context Optional. Context relating to the event.
-		 * @param tstamp Optional. TrackerTimestamp of the event
-		 * @return Payload
-		 */
-		trackAddToCart: function (
-			sku: string,
-			name: string,
-			category: string,
-			unitPrice: string,
-			quantity: string,
-			currency?: string,
-			context?: Array<SelfDescribingJson>,
-			tstamp?: Timestamp): PayloadData {
-
-			return trackSelfDescribingEvent({
-				schema: 'iglu:com.snowplowanalytics.snowplow/add_to_cart/jsonschema/1-0-0',
-				data: removeEmptyProperties({
-					sku: sku,
-					name: name,
-					category: category,
-					unitPrice: unitPrice,
-					quantity: quantity,
-					currency: currency
-				})
-			}, context, tstamp);
-		},
-
-		/**
-		 * Track a remove-from-cart event
-		 *
-		 * @param sku Required. Item's SKU code.
-		 * @param name Optional. Product name.
-		 * @param category Optional. Product category.
-		 * @param unitPrice Optional. Product price.
-		 * @param quantity Required. Quantity removed.
-		 * @param currency Optional. Product price currency.
-		 * @param context Optional. Context relating to the event.
-		 * @param tstamp Optional. TrackerTimestamp of the event
-		 * @return Payload
-		 */
-		trackRemoveFromCart: function (
-			sku: string,
-			name: string,
-			category: string,
-			unitPrice: string,
-			quantity: string,
-			currency?: string,
-			context?: Array<SelfDescribingJson>,
-			tstamp?: Timestamp): PayloadData {
-
-			return trackSelfDescribingEvent({
-				schema: 'iglu:com.snowplowanalytics.snowplow/remove_from_cart/jsonschema/1-0-0',
-				data: removeEmptyProperties({
-					sku: sku,
-					name: name,
-					category: category,
-					unitPrice: unitPrice,
-					quantity: quantity,
-					currency: currency
-				})
-			}, context, tstamp);
 		},
 
 		/**

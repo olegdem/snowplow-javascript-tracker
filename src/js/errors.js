@@ -89,9 +89,9 @@ object.errorManager = function (core) {
 		/**
 		 * Track unhandled exception.
 		 * This method supposed to be used inside try/catch block or with window.onerror
-		 * (contexts won't be attached), but NOT with `addEventListener` - use
-		 * `enableErrorTracker` for this
-		 *
+         * (contexts won't be attached), but NOT with `addEventListener` - use
+         * `enableErrorTracker` for this
+         *
 		 * @param message string Message appeared in console
 		 * @param filename string Source file (not used)
 		 * @param lineno number Line number
